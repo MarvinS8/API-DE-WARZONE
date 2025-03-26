@@ -1,10 +1,12 @@
 ﻿using API_DE_WARZONE.MODELS;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API_DE_WARZONE.Controllers
 {
     [ApiController]
     [Route("api/Warzone")]
+    [Authorize] // 👈 Protege todos los endpoints
     public class WARZONECONTROLLER : ControllerBase
     {
         private static List<Warzone> warzoneObjects = new List<Warzone>
