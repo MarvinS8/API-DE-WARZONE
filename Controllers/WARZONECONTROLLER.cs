@@ -1,66 +1,109 @@
 ﻿using API_DE_WARZONE.MODELS;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 
 namespace API_DE_WARZONE.Controllers
 {
+    [Route("api/[controller]")]
     [ApiController]
-    [Route("api/Warzone")]
-    [Authorize] // 👈 Protege todos los endpoints
-    public class WARZONECONTROLLER : ControllerBase
+    [Authorize] // Protege los endpoints con autenticación
+    public class WarzoneController : ControllerBase
     {
-        private static List<Warzone> warzoneObjects = new List<Warzone>
+        private readonly string _connectionString;
+
+        public WarzoneController(IConfiguration configuration)
         {
-            new Warzone { ID = 1, Nombre = "MP5", Tipo = "SUBFUSIL" },
-            new Warzone { ID = 2, Nombre = "Tanque", Tipo = "Blindado" },
-            new Warzone { ID = 3, Nombre = "Placas", Tipo = "Blindado" },
-            new Warzone { ID = 4, Nombre = "SNIPER", Tipo = "Francotirador" }
-        };
+            _connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new ArgumentNullException(nameof(_connectionString));
+        }
 
-        // GET: api/Warzone
         [HttpGet]
-        public ActionResult<IEnumerable<Warzone>>GetAll() => Ok(warzoneObjects);
+        public ActionResult<IEnumerable<Warzone>> GetAll()
+        {
+            var warzones = new List<Warzone>();
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("SELECT * FROM Warzone", conn);
+                SqlDataReader reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    warzones.Add(new Warzone
+                    {
+                        ID = reader.GetInt32(0),
+                        Nombre = reader.GetString(1),
+                        Tipo = reader.GetString(2)
+                    });
+                }
+            }
+            return Ok(warzones);
+        }
 
-
-        // GET: api/Warzone/{id}
         [HttpGet("{id}")]
         public ActionResult<Warzone> GetById(int id)
         {
-            var warzoneObject = warzoneObjects.FirstOrDefault(o => o.ID == id);
-            return warzoneObject != null ? Ok(warzoneObject) : NotFound();
+            Warzone? warzone = null;
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("SELECT * FROM Warzone WHERE ID = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                SqlDataReader reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    warzone = new Warzone
+                    {
+                        ID = reader.GetInt32(0),
+                        Nombre = reader.GetString(1),
+                        Tipo = reader.GetString(2)
+                    };
+                }
+            }
+            return warzone != null ? Ok(warzone) : NotFound();
         }
 
-        // POST: api/Warzone
         [HttpPost]
-        public ActionResult<Warzone> Create(Warzone warzone)
+        public IActionResult Create([FromBody] Warzone warzone)
         {
-            warzone.ID = warzoneObjects.Any()? warzoneObjects.Max(p=>p.ID)+1:1;
-            warzoneObjects.Add(warzone);
-            return CreatedAtAction(nameof(GetById), new { id = warzone.ID }, warzone);
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("INSERT INTO Warzone (Nombre, Tipo) VALUES (@nombre, @tipo)", conn);
+                cmd.Parameters.AddWithValue("@nombre", warzone.Nombre);
+                cmd.Parameters.AddWithValue("@tipo", warzone.Tipo);
+                cmd.ExecuteNonQuery();
+            }
+            return CreatedAtAction(nameof(GetAll), new { warzone.Nombre }, warzone);
         }
 
-        // PUT: api/warzoneobjects/{id}
         [HttpPut("{id}")]
-        public IActionResult Update(int id, Warzone updatedObject)
+        public IActionResult Update(int id, [FromBody] Warzone warzone)
         {
-            var warzoneObject = warzoneObjects.FirstOrDefault(o => o.ID == id);
-            if (warzoneObject == null) return NotFound();
-
-            warzoneObject.Nombre = updatedObject.Nombre;
-            warzoneObject.Tipo = updatedObject.Tipo;
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("UPDATE Warzone SET Nombre = @nombre, Tipo = @tipo WHERE ID = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@nombre", warzone.Nombre);
+                cmd.Parameters.AddWithValue("@tipo", warzone.Tipo);
+                int rowsAffected = cmd.ExecuteNonQuery();
+                if (rowsAffected == 0) return NotFound();
+            }
             return NoContent();
         }
 
-        // DELETE: api/warzoneobjects/{id}
         [HttpDelete("{id}")]
         public IActionResult Delete(int id)
         {
-            var warzoneObject = warzoneObjects.FirstOrDefault(o => o.ID == id);
-            if (warzoneObject == null) return NotFound();
-
-            warzoneObjects.Remove(warzoneObject);
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand("DELETE FROM Warzone WHERE ID = @id", conn);
+                cmd.Parameters.AddWithValue("@id", id);
+                int rowsAffected = cmd.ExecuteNonQuery();
+                if (rowsAffected == 0) return NotFound();
+            }
             return NoContent();
         }
-
     }
 }
