@@ -1,31 +1,36 @@
 ﻿using API_DE_WARZONE.MODELS;
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
 namespace API_DE_WARZONE.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
-    [Authorize] // Protege los endpoints con autenticación
-    public class WarzoneController : ControllerBase
+    [Authorize(Roles = "Admin")] // También requiere rol Admin
+    [ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/Warzone")]
+    public class WARZONEv1Controller : ControllerBase
     {
         private readonly string _connectionString;
 
-        public WarzoneController(IConfiguration configuration)
+        public WARZONEv1Controller(IConfiguration configuration)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new ArgumentNullException(nameof(_connectionString));
+            _connectionString = configuration.GetConnectionString("DefaultConnection")
+                ?? throw new ArgumentNullException(nameof(_connectionString));
         }
 
         [HttpGet]
         public ActionResult<IEnumerable<Warzone>> GetAll()
         {
             var warzones = new List<Warzone>();
+
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 conn.Open();
                 SqlCommand cmd = new SqlCommand("SELECT * FROM Warzone", conn);
                 SqlDataReader reader = cmd.ExecuteReader();
+
                 while (reader.Read())
                 {
                     warzones.Add(new Warzone
@@ -36,6 +41,7 @@ namespace API_DE_WARZONE.Controllers
                     });
                 }
             }
+
             return Ok(warzones);
         }
 
